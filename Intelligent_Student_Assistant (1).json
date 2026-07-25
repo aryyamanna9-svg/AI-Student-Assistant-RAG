@@ -1,0 +1,589 @@
+{
+  "name": "Intelligent_Student_Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "⚠️ Sorry, I couldn't process that PDF. It may be corrupted, password-protected, or too large. Please try uploading it again or send a different file.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2496,
+        2816
+      ],
+      "id": "666c2dc0-ce2c-4f1c-848b-a4a75bccd112",
+      "name": "Telegram - PDF Error Notice",
+      "webhookId": "9c1a2b3d-4e5f-6789-abcd-0123456789ef",
+      "credentials": {
+        "telegramApi": {
+          "id": "HxqbO73lhEkXJ8mM",
+          "name": "Telegram account 2"
+        }
+      },
+      "notes": "NEW: receives the error output (index 1) from Telegram - Get File and Extract From File (PDF) so the user always gets a clear failure message instead of silence."
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        3040
+      ],
+      "id": "9c717aa6-0e42-42fc-8d6a-8a49cac9091d",
+      "name": "Telegram Trigger1",
+      "webhookId": "c27bd535-89bf-5f2f-9c89-53333f99d3bb",
+      "credentials": {
+        "telegramApi": {
+          "id": "HxqbO73lhEkXJ8mM",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message.document.mime_type }}",
+              "rightValue": "application/pdf",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "66e3acc2-22ed-48f7-b43b-2c5aef782d53"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        3040
+      ],
+      "id": "434991e2-7941-4daf-aede-b2979368873e",
+      "name": "Is PDF Document?1",
+      "notes": "TRUE = message contains a PDF document -> ingest branch. FALSE = plain text -> AI Agent branch."
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.document.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2272,
+        3024
+      ],
+      "id": "cf745ac9-a5a0-4c2e-90d8-c00443984d75",
+      "name": "Telegram - Get File1",
+      "webhookId": "31430267-1cae-4527-886b-287b27546ad8",
+      "credentials": {
+        "telegramApi": {
+          "id": "HxqbO73lhEkXJ8mM",
+          "name": "Telegram account 2"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "notes": "resource=file fetches file info AND downloads the binary in one step. onError set to continueErrorOutput so failures route to the PDF error-notice branch instead of crashing the execution."
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        2496,
+        3024
+      ],
+      "id": "0284cf54-619c-475c-b61c-a78398a1c55f",
+      "name": "Extract From File (PDF)1",
+      "onError": "continueErrorOutput",
+      "notes": "onError set to continueErrorOutput so a corrupt/unreadable PDF routes to the error-notice branch instead of failing the whole workflow silently."
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 200,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        3152,
+        3456
+      ],
+      "id": "b16ae099-7630-43c4-9771-2c789c4be97f",
+      "name": "Recursive Character Text Splitter1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        3024,
+        3280
+      ],
+      "id": "6988d3e5-9b69-43f6-9ebb-ca0386c4aa5d",
+      "name": "Default Data Loader1",
+      "notes": "Feeds chunked document + text splitter into the Qdrant Insert node."
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2720,
+        3280
+      ],
+      "id": "1d38053b-6050-4e5f-a98f-572fd3edd414",
+      "name": "Embeddings Google Gemini (Insert)1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "y7tJiI6I0WVYvJsB",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "aryya",
+          "mode": "list",
+          "cachedResultName": "aryya"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        2720,
+        3024
+      ],
+      "id": "8c4ec41c-9202-49e4-8d7b-73d0ab80f14a",
+      "name": "Qdrant Vector Store (Insert)1",
+      "credentials": {
+        "qdrantApi": {
+          "id": "wfBskwa22OxpprDt",
+          "name": "Qdrant account 6"
+        }
+      },
+      "notes": "Receives ai_document (Default Data Loader) and ai_embedding (Embeddings) inputs, plus the main-chain PDF text from Extract From File."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "✅ Got it! Your PDF has been processed and added to the knowledge base. You can now ask me questions about it.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3152,
+        3024
+      ],
+      "id": "36c06317-1776-4438-812e-0512dfe2268c",
+      "name": "Telegram - Confirm Success1",
+      "webhookId": "20bdbaa5-7dce-4e89-866a-f3210f5e8655",
+      "credentials": {
+        "telegramApi": {
+          "id": "HxqbO73lhEkXJ8mM",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-chatinput-0001",
+              "name": "chatInput",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            },
+            {
+              "id": "ae814b16-4a89-4081-9db9-cc517003767e",
+              "name": "chatId",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        3200
+      ],
+      "id": "fcde77f3-eb15-4ee6-8c5f-9efdb397cf62",
+      "name": "Normalize Telegram Input1",
+      "notes": "chatId reads the real chat id from the incoming message instead of being hardcoded to 0."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are a helpful student assistant. First try to answer using the student_assistant knowledge base (indexed PDFs, notes, study materials) via the Qdrant tool. If the answer is not found there, or the question is about current events, recent information, or anything outside the indexed documents, use the SerpAPI web search tool to find the answer. If neither source has the answer, say so clearly instead of making something up. Always tell the user briefly whether your answer came from the study materials or from a web search.IMPORTANT:\nReply using plain text only.\n\nDo NOT use:\n- **\n- *\n- __\n- #\n- `\n- Markdown\n- HTML\n- bullet formatting\n\nReturn plain text suitable for Telegram."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1744,
+        3200
+      ],
+      "id": "4f681144-7965-4281-8017-0cb0fa8848a2",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.chatId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        1744,
+        3456
+      ],
+      "id": "465568b6-995b-4f4c-8201-509781e42031",
+      "name": "Simple Memory1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1504,
+        3440
+      ],
+      "id": "893a0ae9-3b8d-4f65-bed9-b9326e40fb60",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "y7tJiI6I0WVYvJsB",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        3680
+      ],
+      "id": "66a7058f-224c-40d0-b22d-d72a2edc9717",
+      "name": "Embeddings Google Gemini (Retrieve)1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "y7tJiI6I0WVYvJsB",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Search and retrieve relevant information from indexed student study materials, PDFs, lecture notes, and academic documents using semantic search.",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "aryya",
+          "mode": "list",
+          "cachedResultName": "aryya"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        2096,
+        3488
+      ],
+      "id": "7b5ae800-f3a8-43e4-80de-ca94e93f0fa6",
+      "name": "Qdrant Vector Store (Retrieve Tool)1",
+      "credentials": {
+        "qdrantApi": {
+          "id": "wfBskwa22OxpprDt",
+          "name": "Qdrant account 6"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolSerpApi",
+      "typeVersion": 1,
+      "position": [
+        1888,
+        3648
+      ],
+      "id": "152cd1aa-0ed1-4866-9a45-16ebd8ae006d",
+      "name": "SerpAPI1",
+      "credentials": {
+        "serpApi": {
+          "id": "6IMlXTgpu5l4JFMp",
+          "name": "SerpApi account"
+        }
+      },
+      "notes": "FIXED: now wired into the AI Agent's ai_tool input so it will actually be called. You still need to add valid SerpAPI credentials to this node (open it and select/create a SerpAPI credential) or the tool call will fail at runtime."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2016,
+        3200
+      ],
+      "id": "23ad06bc-d804-45a4-9e64-2ee092ecc267",
+      "name": "Telegram - Send Reply1",
+      "webhookId": "60d14062-ee0a-466b-9cb1-c7de47c2864b",
+      "credentials": {
+        "telegramApi": {
+          "id": "HxqbO73lhEkXJ8mM",
+          "name": "Telegram account 2"
+        }
+      },
+      "notes": "Connects directly from AI Agent's output field ($json.output), so it sends the AI's answer, not the user's raw input."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Is PDF Document?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is PDF Document?1": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Get File1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Telegram Input1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Get File1": {
+      "main": [
+        [
+          {
+            "node": "Extract From File (PDF)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - PDF Error Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From File (PDF)1": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store (Insert)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - PDF Error Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter1": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader1",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader1": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store (Insert)1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini (Insert)1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store (Insert)1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store (Insert)1": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Confirm Success1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Telegram Input1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Reply1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini (Retrieve)1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store (Retrieve Tool)1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store (Retrieve Tool)1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SerpAPI1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "84d299a2-640e-42ea-a216-545e864988f2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d708a4a480b303c0896a9dc5e74b182d7d01bbc0624377458e7d58982f658bf7"
+  },
+  "nodeGroups": [],
+  "id": "x2kE1rtqS0hu0VTN",
+  "tags": []
+}
